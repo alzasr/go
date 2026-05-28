@@ -86,6 +86,7 @@ func (s *Shutdowner) Go(process func()) error {
 		defer s.DoneProcess()
 		process()
 	}()
+	return nil
 }
 
 func (s *Shutdowner) DoneProcess() {
@@ -101,6 +102,7 @@ func (s *Shutdowner) Close() error {
 	if err != nil {
 		return fmt.Errorf("wait processes: %w", err)
 	}
+	return nil
 }
 
 func (s *Shutdowner) stopHandle() {
