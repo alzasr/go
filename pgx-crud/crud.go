@@ -1,12 +1,14 @@
-package pg_crud
+package pgx_crud
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"strings"
 
 	"github.com/Masterminds/squirrel"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 const idFieldName = "id"
@@ -18,8 +20,8 @@ type Filter interface {
 
 // New конструктор
 func New[T any](
+	db *pgxpool.Pool,
 	table string,
-	db *pgx.Conn,
 	options ...Options,
 ) (*Crud[T], error) {
 	crud := &Crud[T]{
@@ -44,8 +46,8 @@ func New[T any](
 // Crud реализация базовых операций
 type Crud[T any] struct {
 	table        string
-	db           *pgx.Conn
-	queriBuilder squirrel.StatementBuilderType
+	db           *pgxpool.Pool
+	builder      squirrel.StatementBuilderType
 	selectFields []string
 	insertFields []string
 	updateFields []string
@@ -196,10 +198,64 @@ func WithTracingPrefix(prefix string) Options {
 // Options опциональные параметры конструктора
 type Options func(c *crudOptions)
 
-// возращает кастомную ошибку если она имплементирована, либо возращает базовую ошибку
+// возращает кастомную ошибку если она имплементирована , либо возращает базовую ошибку
 func (c *Crud[T]) getNotFoundErrorOrErr(err error) error {
 	if c.options.NotFoundError != nil {
 		return c.options.NotFoundError
 	}
 	return err
+}
+
+type queryBuilder interface {
+	ToSql() (string, []any, error)
+}
+
+func (c *Crud[T]) exec(ctx context.Context, query queryBuilder) (int64, error) {
+	sql, params, err := query.ToSql()
+	if err != nil {
+		return 0, fmt.Errorf("buildQuery: %w", err)
+	}
+	tag, err := c.db.Exec(ctx, sql, params...)
+	if err != nil {
+		return 0, fmt.Errorf("db.Exec: %w", err)
+	}
+	return tag.RowsAffected(), nil
+}
+
+func (c *Crud[T]) query(ctx context.Context, query queryBuilder) (pgx.Rows, error) {
+	sql, params, err := query.ToSql()
+	if err != nil {
+		return nil, fmt.Errorf("buildQuery: %w", err)
+	}
+	rows, err := c.db.Query(ctx, sql, params...)
+	if err != nil {
+		return nil, fmt.Errorf("db.Query: %w", err)
+	}
+	return rows, nil
+}
+
+func (c *Crud[T]) queryOne(ctx context.Context, query queryBuilder) (*T, error) {
+	rows, err := c.query(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("query: %w", err)
+	}
+	res, err := pgx.CollectOneRow(rows, pgx.RowToAddrOfStructByName[T])
+	if err != nil {
+		return nil, fmt.Errorf("pgx.CollectOneRow: %w", err)
+	}
+
+	return res, nil
+}
+
+func (c *Crud[T]) queryAll(ctx context.Context, query queryBuilder) ([]*T, error) {
+	rows, err := c.query(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("query: %w", err)
+	}
+	res, err := pgx.CollectRows(rows, pgx.RowToAddrOfStructByName[T])
+	if err != nil {
+		return nil, fmt.Errorf("pgx.CollectOneRow: %w", err)
+	}
+
+	return res, nil
 }

@@ -1,31 +1,23 @@
-package pg_crud
+package pgx_crud
 
 import (
 	"context"
 	"fmt"
-
-	"github.com/jackc/pgx/v5"
 )
 
 // Create сохранение элемента в базе
 func (c *Crud[T]) Create(ctx context.Context, model *T) (*T, error) {
-	query, params, err := c.queriBuilder.
+
+	query := c.builder.
 		Insert(c.table).
 		SetMap(c.createValues(model)).
-		Suffix(c.returning()).
-		ToSql()
-	if err != nil {
-		return nil, fmt.Errorf("build query: %w", err)
-	}
-	rows, err := c.db.Query(ctx, query, params...)
-	if err != nil {
+		Suffix(c.returning())
 
-	}
-	res, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[T])
+	res, err := c.queryOne(ctx, query)
 	if err != nil {
-		return nil, fmt.Errorf("getx: %w", err)
+		return nil, fmt.Errorf("queryOne: %w", err)
 	}
-	return &res, nil
+	return res, nil
 }
 
 func (c *Crud[T]) createValues(model *T) map[string]any {

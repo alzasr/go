@@ -1,4 +1,4 @@
-package pg_crud
+package pgx_crud
 
 import (
 	"errors"
@@ -7,8 +7,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var errNotFoundExample = errors.New("not found error example")
-
 func TestFillSelectFields(t *testing.T) {
 	t.Run("simple", func(t *testing.T) {
 		type testStruct struct {
@@ -16,7 +14,7 @@ func TestFillSelectFields(t *testing.T) {
 			Name string
 		}
 
-		crud, err := New[testStruct]("", nil)
+		crud, err := New[testStruct](nil, "")
 		if err != nil {
 			t.Error(err)
 		}
@@ -29,20 +27,20 @@ func TestFillSelectFields(t *testing.T) {
 			MyName string `db:"other_name"`
 		}
 
-		crud, err := New[testStruct]("", nil)
+		crud, err := New[testStruct](nil, "")
 		if err != nil {
 			t.Error(err)
 		}
 		assert.ElementsMatch(t, []string{`"id"`, `"other_name"`}, crud.selectFields)
 	})
 
-	t.Run("camelCase_converter", func(t *testing.T) {
+	t.Run("case_converter", func(t *testing.T) {
 		type testStruct struct {
 			ID     int64
 			MyName string
 		}
 
-		crud, err := New[testStruct]("", nil)
+		crud, err := New[testStruct](nil, "")
 		if err != nil {
 			t.Error(err)
 		}
@@ -59,7 +57,7 @@ func TestFillSelectFields(t *testing.T) {
 			Name string
 		}
 
-		crud, err := New[child]("", nil)
+		crud, err := New[child](nil, "")
 		if err != nil {
 			t.Error(err)
 		}
@@ -72,7 +70,7 @@ func TestCustomError(t *testing.T) {
 		type TestStruct struct {
 			ID int64
 		}
-		crud, err := New[TestStruct]("", nil, WithNorFoundError(errNotFoundExample))
+		crud, err := New[TestStruct](nil, "", WithNorFoundError(errNotFoundExample))
 		if err != nil {
 			t.Error(err)
 		}
@@ -85,7 +83,7 @@ func TestCustomError(t *testing.T) {
 		type TestStruct struct {
 			ID int64
 		}
-		crud, err := New[TestStruct]("", nil)
+		crud, err := New[TestStruct](nil, "")
 		if err != nil {
 			t.Error(err)
 		}

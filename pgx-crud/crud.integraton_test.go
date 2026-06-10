@@ -1,11 +1,12 @@
-package pg_crud
+package pgx_crud
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -25,7 +26,12 @@ CREATE TABLE IF NOT EXISTS "model" (
     "from" TEXT                               
 )
 `
+	errNotFoundExample = errors.New("not found error example")
 )
+
+func TestCrud(t *testing.T) {
+	suite.Run(t, new(Suite))
+}
 
 type BaseModel struct {
 	ID        int64 `dbSkip:"insert,update"`
@@ -53,31 +59,32 @@ func (suite *Suite) SetupSuite() {
 	//if pgDsn == "" {
 	//	suite.FailNow(PGDSNENV + " ENVIRONMENT VARIABLE IS REQUIRED")
 	//}
-	pgDsn := "postgresql://postgres:postgres@localhost:5432/pgxcrud?sslmode=disable"
+	pgDsn := "postgresql://postgres:postgres@localhost:5432/postgres?sslmode=disable"
 	suite.ctx = context.Background()
 
-	dbConn, err := pgx.Connect(suite.ctx, pgDsn)
+	db, err := pgxpool.New(suite.ctx, pgDsn)
 	if err != nil {
 		suite.FailNow(err.Error())
 	}
 
-	suite.crud, err = New[Model]("model", dbConn)
+	suite.crud, err = New[Model](db, "model")
 	if err != nil {
 		suite.FailNow(err.Error())
 	}
-	_, err = dbConn.Exec(suite.ctx, "DROP TABLE model")
-	if err != nil {
-		suite.FailNow(err.Error())
-	}
-	_, err = dbConn.Exec(suite.ctx, schema)
-	if err != nil {
-		suite.FailNow(err.Error())
-	}
-}
 
-func TestCrud(t *testing.T) {
-	suite.Run(t, new(Suite))
+	_, err = db.Exec(suite.ctx, "DROP TABLE IF EXISTS model")
+	if err != nil {
+		suite.FailNow(err.Error())
+	}
+	_, err = db.Exec(suite.ctx, schema)
+	if err != nil {
+		suite.FailNow(err.Error())
+	}
 }
 
 func (suite *Suite) TearDownSuite() {
+	//_, err := suite.crud.db.GetRunner(suite.ctx).Exec(suite.ctx, `DROP TABLE "model"`)
+	//if err != nil {
+	//	suite.FailNow("cant teardown env: ", err.Error())
+	//}
 }

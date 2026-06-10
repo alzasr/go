@@ -1,4 +1,4 @@
-package pg_crud
+package pgx_crud
 
 import (
 	"regexp"
